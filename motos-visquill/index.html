@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Motocicletas no Brasil – Usados x Novos · 2024</title>
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- D3 -->
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+
+  <style>
+    :root {
+      --bg-main: #050509;
+      --bg-map: #020208;
+      --accent-cyan: #4ef2e3;
+      --accent-pink: #ff4c7a;
+      --accent-orange: #ff8a3b;
+      --text-muted: #a8a8c5;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+        Roboto, sans-serif;
+      background: var(--bg-main);
+      color: #f8f8ff;
+      overflow: hidden;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      height: 100vh;
+      position: relative;
+    }
+
+    /* SIDEBAR ---------------------------------------------------------- */
+    .sidebar {
+      padding: 22px 24px;
+      background: radial-gradient(circle at top left, #232345 0%, #050509 60%);
+      border-right: 1px solid rgba(255, 255, 255, 0.05);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      z-index: 10;
+    }
+
+    .sidebar h2 {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      color: #9fa8ff;
+    }
+
+    .sidebar h1 {
+      font-size: 22px;
+      line-height: 1.2;
+      margin-top: 4px;
+    }
+
+    .sidebar p {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .section-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: #9fa8ff;
+      margin-top: 4px;
+      margin-bottom: 4px;
+    }
+
+    .legend {
+      font-size: 11px;
+      color: var(--text-muted);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .legend-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .legend-color {
+      width: 14px;
+      height: 14px;
+      border-radius: 3px;
+    }
+
+    .legend-line {
+      height: 1px;
+      margin: 4px 0 6px;
+      background: linear-gradient(90deg, transparent, #555, transparent);
+      opacity: 0.8;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      background: rgba(255, 255, 255, 0.04);
+      color: #dadaf7;
+    }
+
+    .pill-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent-orange);
+    }
+
+    .chart-container {
+      padding: 8px 10px;
+      background: rgba(5, 5, 20, 0.9);
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    #ageChart {
+      width: 100%;
+      height: 130px;
+    }
+
+    .chart-note {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .footer {
+      margin-top: auto;
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+
+    .footer a {
+      color: #b3b7ff;
+      text-decoration: none;
+    }
+    .footer a:hover {
+      text-decoration: underline;
+    }
+
+    /* MAPA ------------------------------------------------------------- */
+    #map {
+      width: 100%;
+      height: 100vh;
+      background: var(--bg-map);
+    }
+
+    .leaflet-container {
+      background: var(--bg-map);
+    }
+
+    .region-fill {
+      fill: #050509;
+      stroke: #34344c;
+      stroke-width: 1.2;
+    }
+
+    .circle-region {
+      stroke: rgba(255, 255, 255, 0.9);
+      stroke-width: 1.2;
+      fill-opacity: 0.9;
+    }
+
+    .region-popup h3 {
+      margin: 0 0 4px;
+      font-size: 13px;
+    }
+
+    .region-popup div {
+      font-size: 11px;
+      color: #f0f0ff;
+    }
+
+    /* Rótulo da frota (milhões) ----------------------------------- */
+    .leaflet-tooltip.fleet-label {
+      background: transparent;
+      border: none;
+      box-shadow: none;
+      color: var(--text-muted);
+      font-size: 10px;
+      text-align: center;
+      text-shadow: 0 0 4px #000;
+      padding: 0;
+    }
+
+    /* Tooltip animado com ícone de moto ---------------------------- */
+    .leaflet-tooltip.moto-tooltip {
+      background: rgba(16, 16, 32, 0.97);
+      border-radius: 10px;
+      padding: 6px 10px;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      box-shadow: 0 0 12px rgba(0, 0, 0, 0.7);
+      color: #ffffff;
+      font-size: 11px;
+      line-height: 1.3;
+      transform-origin: bottom center;
+      animation: popIn 0.18s ease-out;
+    }
+
+    .moto-popup-title {
+      font-weight: 600;
+      margin-bottom: 2px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .moto-popup-title span.emoji {
+      font-size: 14px;
+    }
+
+    .moto-popup-line {
+      opacity: 0.9;
+    }
+
+    .moto-popup-line strong {
+      font-weight: 600;
+    }
+
+    @keyframes popIn {
+      from {
+        transform: scale(0.8) translateY(4px);
+        opacity: 0;
+      }
+      to {
+        transform: scale(1) translateY(0);
+        opacity: 1;
+      }
+    }
+
+    /* WIDGET CIRCULAR ----------------------------------------------- */
+    .circle-widget {
+      position: absolute;
+      right: 70px;
+      bottom: 70px;
+      width: 150px;
+      height: 150px;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 255, 255, 0.8);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      z-index: 500;
+      background: radial-gradient(circle at center, rgba(12, 12, 40, 0.95), rgba(2, 2, 10, 0.85));
+      box-shadow: 0 0 16px rgba(0, 0, 0, 0.7);
+    }
+
+    .cw-region {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #dcdcff;
+      margin-bottom: 4px;
+    }
+
+    .cw-ratio {
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--accent-orange);
+      margin-bottom: 2px;
+    }
+
+    .cw-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      margin-bottom: 4px;
+    }
+
+    .cw-sub {
+      font-size: 10px;
+      color: #c8c8ff;
+      text-align: center;
+      max-width: 120px;
+      line-height: 1.3;
+    }
+
+    .cw-highlight {
+      color: var(--accent-cyan);
+      font-weight: 600;
+    }
+
+    @media (max-width: 880px) {
+      .layout {
+        grid-template-columns: 1fr;
+        grid-template-rows: 260px 1fr;
+      }
+      #map {
+        height: calc(100vh - 260px);
+      }
+      .circle-widget {
+        right: 30px;
+        bottom: 30px;
+        width: 130px;
+        height: 130px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div>
+      <h2>Brasil · Motocicletas · 2024</h2>
+      <h1>Usados x Novos por Região</h1>
+    </div>
+
+    <p>
+      Mapa temático inspirado em visualizações da série
+      <em>Visquill</em>. Foi utilizado o limite de regiões do Brasil do IBGE e dados da FENABRAVE (2025).
+      <br><br>
+      Os circulos mostram, para cada região, a
+      <strong>proporção de vendas de usadas em relação a emplacamentos de novas</strong>.
+      Quanto maior o círculo, mais forte é o mercado de usadas frente às zero km.
+
+    </p>
+
+
+    <div>
+
+    <div>
+      <div class="section-title">Distribuição da idade das motos usadas</div>
+      <div class="legend" style="margin-bottom:4px;">
+        <div class="legend-row">
+          <div class="legend-color" style="background:var(--accent-cyan);"></div>
+          <span>Cyan – Usadas com até 10 anos (50,5%)</span>
+        </div>
+        <div class="legend-row">
+          <div class="legend-color" style="background:var(--accent-pink);"></div>
+          <span>Rosa – Usadas com mais de 10 anos (49,5%)</span>
+        </div>
+      </div>
+      <div class="chart-container">
+        <svg id="ageChart"></svg>
+        <div class="chart-note">
+          Até 10 anos = 50,5% das transações de usadas (2024).
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      Fonte:
+      <a href="https://www.fenabrave.org.br/portalv2" target="_blank">
+        Fenabrave – Anuário 2025 (dados 2024)
+      </a>.<br/>
+      Elaborado por <strong>CyMolina</strong> –
+      <a href="https://github.com/cymolina" target="_blank">github.com/cymolina</a>
+    </div>
+  </aside>
+
+  <!-- MAPA -->
+  <div id="map"></div>
+
+  <!-- WIDGET CIRCULAR (overlay no mapa) -->
+  <div class="circle-widget" id="circleWidget">
+    <div class="cw-region" id="cwRegion">Brasil</div>
+    <div class="cw-ratio" id="cwRatio">1,9 : 1</div>
+    <div class="cw-label">USADOS / NOVAS</div>
+    <div class="cw-sub" id="cwSub">
+      <span class="cw-highlight">100%</span> da frota nacional de motos.
+    </div>
+  </div>
+</div>
+
+<script>
+  const baseURL    = "./data/";
+  const motosURL   = baseURL + "motocicletas_brasil_2024.geojson";
+  const idadeURL   = baseURL + "motocicletas_usados_idade_2024.geojson";
+  const regioesURL = baseURL + "regioes_brasil.geojson";
+
+  const map = L.map("map", {
+    zoomControl: false,
+    attributionControl: false
+  });
+
+  map.setView([-15, -54], 4);
+  L.control.zoom({ position: "bottomright" }).addTo(map);
+
+  const cwRegion = document.getElementById("cwRegion");
+  const cwRatio  = document.getElementById("cwRatio");
+  const cwSub    = document.getElementById("cwSub");
+
+  function classificaMercado(ratio) {
+    if (ratio < 1.5) return "mercado equilibrado entre usadas e zero km";
+    if (ratio < 2.5) return "predomínio moderado de motos usadas";
+    return "mercado muito forte de motos usadas";
+  }
+
+  Promise.all([
+    fetch(regioesURL).then(r => r.json()),
+    fetch(motosURL).then(r => r.json()),
+    fetch(idadeURL).then(r => r.json())
+  ]).then(([regioesData, motosData, idadeData]) => {
+
+    // REGIÕES
+    const regioesLayer = L.geoJSON(regioesData, {
+      style: {
+        className: "region-fill",
+        fillColor: "#050509",
+        fillOpacity: 1,
+        color: "#34344c",
+        weight: 1.1
+      }
+    }).addTo(map);
+
+    map.fitBounds(regioesLayer.getBounds().pad(0.2));
+
+    // GARANTIR 1 PONTO POR REGIÃO (ignorando "Brasil" se existir)
+    const byRegion = {};
+    motosData.features
+      .filter(f => f.properties && f.properties.region !== "Brasil")
+      .forEach(f => {
+        const reg = f.properties.region;
+        if (!byRegion[reg]) byRegion[reg] = f; // mantém só o primeiro
+      });
+
+    const motosClean = {
+      type: "FeatureCollection",
+      features: Object.values(byRegion)
+    };
+
+    const ratios = motosClean.features.map(f => f.properties.used_to_new_ratio_2024);
+    const ages   = motosClean.features.map(f => f.properties.avg_fleet_age_2024);
+
+    const radiusScale = d3.scaleLinear()
+      .domain([Math.min(...ratios), Math.max(...ratios)])
+      .range([10, 32]);
+
+    const colorScale = d3.scaleLinear()
+      .domain([Math.min(...ages), Math.max(...ages)])
+      .range(["var(--accent-cyan)", "var(--accent-pink)"])
+      .interpolate(d3.interpolateRgb);
+
+    const totalFleet = motosClean.features
+      .map(f => f.properties.fleet_2024)
+      .reduce((a, b) => a + b, 0);
+
+    // BOLHAS + RÓTULO DE FROTA + TOOLTIP
+    L.geoJSON(motosClean, {
+      pointToLayer: (feature, latlng) => {
+        const p = feature.properties;
+        const radius = radiusScale(p.used_to_new_ratio_2024);
+        p._baseRadius = radius;
+
+        const marker = L.circleMarker(latlng, {
+          radius: radius,
+          fillColor: colorScale(p.avg_fleet_age_2024),
+          color: "#ffffff",
+          weight: 1.2,
+          className: "circle-region"
+        });
+
+        const labelText =
+          (p.fleet_2024 / 1_000_000).toFixed(1).replace(".", ",") + " M";
+
+        marker.bindTooltip(labelText, {
+          permanent: true,
+          direction: "bottom",
+          offset: L.point(0, 6),
+          className: "fleet-label"
+        });
+
+        return marker;
+      },
+      onEachFeature: (feature, layer) => {
+        const p = feature.properties;
+        const share = (p.fleet_2024 / totalFleet) * 100;
+
+        const tooltipHtml = `
+          <div class="moto-popup">
+            <div class="moto-popup-title">
+              <span class="emoji">🏍️</span>
+              <span>${p.region}</span>
+            </div>
+            <div class="moto-popup-line">
+              <strong>Usados / novas:</strong> ${p.used_to_new_ratio_2024.toFixed(1)} : 1
+            </div>
+            <div class="moto-popup-line">
+              <strong>Frota:</strong> ${p.fleet_2024.toLocaleString("pt-BR")} motos
+            </div>
+            <div class="moto-popup-line">
+              <strong>Idade média:</strong> ${p.avg_fleet_age_2024.toFixed(1)} anos
+            </div>
+            <div class="moto-popup-line">
+              <strong>Participação:</strong> ${share.toFixed(1)}% da frota Brasil
+            </div>
+          </div>
+        `;
+
+        // tooltip estilo Visquill ao passar o mouse
+        layer.bindTooltip(tooltipHtml, {
+          direction: "top",
+          className: "moto-tooltip",
+          sticky: true,
+          opacity: 1
+        });
+
+        function atualizaWidget() {
+          cwRegion.textContent = p.region;
+          cwRatio.textContent =
+            p.used_to_new_ratio_2024.toFixed(1).replace(".", ",") + " : 1";
+          cwSub.innerHTML =
+            `<span class="cw-highlight">${share.toFixed(1)}%</span> da frota nacional · ` +
+            `${classificaMercado(p.used_to_new_ratio_2024)}.`;
+        }
+
+        function resetWidget() {
+          cwRegion.textContent = "Brasil";
+          cwRatio.textContent  = "1,9 : 1";
+          cwSub.innerHTML =
+            `<span class="cw-highlight">100%</span> da frota nacional de motos.`;
+        }
+
+        layer.on("mouseover", () => {
+          layer.setStyle({ radius: p._baseRadius * 1.3, weight: 2 });
+          atualizaWidget();
+        });
+
+        layer.on("mouseout", () => {
+          layer.setStyle({ radius: p._baseRadius, weight: 1.2 });
+          resetWidget();
+        });
+      }
+    }).addTo(map);
+
+    // GRÁFICO LATERAL – idade das usadas
+    const ageBands = idadeData.features.map(f => ({
+      label: f.properties.age_band === "até_10_anos" ? "Até 10 anos" : "Mais de 10 anos",
+      key:   f.properties.age_band,
+      value: f.properties.used_pct_2024
+    }));
+
+    const svg  = d3.select("#ageChart");
+    const w    = svg.node().clientWidth || 260;
+    const h    = svg.node().clientHeight || 130;
+    const m    = { top: 10, right: 10, bottom: 26, left: 32 };
+    const iw   = w - m.left - m.right;
+    const ih   = h - m.top - m.bottom;
+
+    const g = svg
+      .attr("width", w)
+      .attr("height", h)
+      .append("g")
+      .attr("transform", `translate(${m.left},${m.top})`);
+
+    const x = d3.scaleBand()
+      .domain(ageBands.map(d => d.key))
+      .range([0, iw])
+      .padding(0.35);
+
+    const y = d3.scaleLinear()
+      .domain([0, d3.max(ageBands, d => d.value) + 5])
+      .range([ih, 0]);
+
+    const xAxis = d3.axisBottom(x)
+      .tickFormat(d => d === "até_10_anos" ? "Até 10 anos" : "Mais de 10 anos");
+
+    g.append("g")
+      .attr("transform", `translate(0,${ih})`)
+      .call(xAxis)
+      .selectAll("text")
+      .attr("fill", "#d8d8ff")
+      .attr("font-size", 10);
+
+    const yAxis = d3.axisLeft(y)
+      .ticks(3)
+      .tickFormat(d => d + "%");
+
+    g.append("g")
+      .call(yAxis)
+      .selectAll("text")
+      .attr("fill", "#a4a4c4")
+      .attr("font-size", 9);
+
+    g.selectAll(".domain, .tick line").attr("stroke", "#555");
+
+    g.selectAll("rect.bar")
+      .data(ageBands)
+      .enter()
+      .append("rect")
+      .attr("class", "bar")
+      .attr("x", d => x(d.key))
+      .attr("y", d => y(d.value))
+      .attr("width", x.bandwidth())
+      .attr("height", d => ih - y(d.value))
+      .attr("rx", 4)
+      .attr("ry", 4)
+      .attr("fill", (d, i) => i === 0 ? "var(--accent-cyan)" : "var(--accent-pink)");
+
+    g.selectAll("text.bar-label")
+      .data(ageBands)
+      .enter()
+      .append("text")
+      .attr("class", "bar-label")
+      .attr("x", d => x(d.key) + x.bandwidth() / 2)
+      .attr("y", d => y(d.value) - 4)
+      .attr("text-anchor", "middle")
+      .attr("fill", "#ffffff")
+      .attr("font-size", 10)
+      .text(d => d.value.toFixed(1) + "%");
+  }).catch(err => {
+    console.error("Erro ao carregar dados:", err);
+  });
+</script>
+
+</body>
+</html>

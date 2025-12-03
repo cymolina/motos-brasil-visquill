@@ -1,0 +1,36 @@
+{
+  "type": "FeatureCollection",
+  "name": "motocicletas_usados_idade_2024",
+  "crs": {
+    "type": "name",
+    "properties": { "name": "EPSG:4326" }
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "region": "Brasil",
+        "age_band": "até_10_anos",
+        "used_pct_2024": 50.5,
+        "description": "Percentual de transações de motos usadas com até 10 anos de idade."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-54.0, -14.0]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "region": "Brasil",
+        "age_band": "mais_de_10_anos",
+        "used_pct_2024": 49.5,
+        "description": "Percentual complementar estimado para motos com mais de 10 anos."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-54.0, -14.0]
+      }
+    }
+  ]
+}
